@@ -21,6 +21,10 @@
 # limitations under the License.
 #
 
+chef_gem 'xml-simple'
+
+require 'xmlsimple'
+
 home_path     = node['jenkins']['server']['home']
 server_user   = node['jenkins']['server']['user']
 server_group  = node['jenkins']['server']['group']
@@ -243,7 +247,6 @@ end
 # this is defined after http_request/remote_file because the package
 # providers will throw an exception if `source' doesn't exist
 package "jenkins" do
-  provider  package_provider
   source    local if node.platform != "ubuntu"
   action    :nothing
 end
