@@ -28,7 +28,7 @@ def jenkins_node_defaults(args)
   args[:executors] ||= 1
   args[:mode] ||= "NORMAL" #"NORMAL" or "EXCLUSIVE"
   args[:labels] ||= ""
-  args[:launcher] ||= "jnlp" #"jnlp" or "command" or "ssh"
+  args[:launcher] ||= "jnlp" #"jnlp" or "command" or "ssh" or "service"
   args[:availability] ||= "Always" #"Always" or "Demand"
   args[:env] = args[:env] ? args[:env].to_hash : nil
   args[:mode].upcase!
@@ -51,6 +51,7 @@ def jenkins_node_defaults(args)
     args[:jvm_options] ||= ""
     args[:host_dsa_public] ||= nil
     args[:host_rsa_public] ||= nil
+  when "service"
   end
 
   args
@@ -100,6 +101,8 @@ def jenkins_node_manage(args)
 
     launcher = %Q(new_ssh_launcher(["#{args[:host]}", #{args[:port]}, "#{args[:username]}", #{password},
                                     "#{args[:private_key]}", "#{args[:jvm_options]}"] as Object[]))
+  when "service"
+    launcher = %Q(new ManagedWindowsServiceLauncher("#{args[:username]}","#{args[:password]}","#{args[:host]}"))
   end
 
   remote_fs = args[:remote_fs].gsub('\\', '\\\\\\') # C:\jenkins -> C:\\jenkins
@@ -111,16 +114,17 @@ def jenkins_node_manage(args)
   end
 
   return <<EOF
-import jenkins.model.*
-import jenkins.slaves.*
+import hudson.model.*
+import hudson.slaves.*
+import hudson.os.windows.ManagedWindowsServiceLauncher
 
-app = Jenkins.instance
+app = Hudson.instance
 env = #{env}
 props = []
 
 def new_ssh_launcher(args) {
-  Jenkins.instance.pluginManager.getPlugin("ssh-slaves").classLoader.
-    loadClass("jenkins.plugins.sshslaves.SSHLauncher").
+  Hudson.instance.pluginManager.getPlugin("ssh-slaves").classLoader.
+    loadClass("hudson.plugins.sshslaves.SSHLauncher").
       getConstructor([String, int, String, String, String, String] as Class[]).newInstance(args)
 }
 

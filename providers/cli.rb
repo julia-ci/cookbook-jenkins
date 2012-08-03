@@ -37,18 +37,17 @@ def action_run
     not_if { ::File.exists?(cli_jar) }
   end
 
-  java_home = node[:jenkins][:java_home] || (node.has_key?(:java) ? node[:java][:jdk_dir] : nil)
+  java_home = node[:os] != 'windows' ? (node[:jenkins][:java_home] || (node.has_key?(:java) ? node[:java][:jdk_dir] : nil)) : nil
   if java_home == nil
     java = "java"
   else
     java = ::File.join(java_home, "bin", "java")
   end
 
-  command = "#{java} -jar #{cli_jar} -s #{url} #{@new_resource.command}"
+  jenkins_command = "#{java} -jar #{cli_jar} -s #{url} #{@new_resource.command}"
 
-  jenkins_execute command do
+  jenkins_execute jenkins_command do
     cwd home
     block { |stdout| new_resource.block.call(stdout) } if new_resource.block
-    only_if new_resource.only_if
   end
 end

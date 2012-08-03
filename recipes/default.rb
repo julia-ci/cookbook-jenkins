@@ -53,6 +53,8 @@ directory "#{home_path}/.ssh" do
   group   server_group
 end
 
+if !node['jenkins']['server']['keyfiles']
+
 execute "ssh-keygen -f #{pkey} -N ''" do
   user    server_user
   group   server_group
@@ -65,6 +67,18 @@ ruby_block "store jenkins ssh pubkey" do
     node.set['jenkins']['server']['pubkey'] =
       ::File.open("#{pkey}.pub") { |f| f.gets }
   end
+end
+else
+file pkey do
+    user    server_user
+    group   server_group
+    content IO.read(node['jenkins']['server']['keyfiles']['priv'])
+end
+file "#{pkey}.pub" do
+    user    server_user
+    group   server_group
+    content IO.read(node['jenkins']['server']['keyfiles']['pub'])
+end
 end
 
 directory "#{home_path}/plugins" do

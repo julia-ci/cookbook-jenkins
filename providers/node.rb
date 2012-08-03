@@ -33,9 +33,17 @@ def action_create
     backup false
   end
 
-  cookbook_file "#{node['jenkins']['node']['home']}/node_info.groovy" do
+if node['os'] != "windows"
+  cookbook_file "#{node[:jenkins][:node][:home]}/node_info.groovy" do
+    source "node_info.groovy"
+    owner node[:jenkins][:node][:user]
+    group node[:jenkins][:node][:user]
+  end
+else
+  cookbook_file "#{node[:jenkins][:node][:home]}/node_info.groovy" do
     source "node_info.groovy"
   end
+end
 
   jenkins_cli "groovy node_info.groovy #{new_resource.name}" do
     block do |stdout|
@@ -49,6 +57,7 @@ def action_create
         ::File.open(gscript, "w") {|f| f.write jenkins_node_manage(new_node) }
       end
     end
+    action :run
   end
 
   jenkins_cli "groovy #{gscript}" do

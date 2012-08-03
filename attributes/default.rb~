@@ -106,6 +106,7 @@ default['jenkins']['node']['env'] = nil
 default['jenkins']['node']['user'] = "jenkins-node"
 
 #SSH options
+puts node['fqdn']
 default['jenkins']['node']['ssh_host'] = node['fqdn']
 default['jenkins']['node']['ssh_port'] = 22
 default['jenkins']['node']['ssh_user'] = default['jenkins']['node']['user']

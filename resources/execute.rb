@@ -25,6 +25,7 @@ actions :run
 
 attribute :command, :kind_of => String
 attribute :cwd, :kind_of => String
+attribute :path, :kind_of => String
 attribute :timeout, :kind_of => Integer
 attribute :block, :kind_of => Proc
 

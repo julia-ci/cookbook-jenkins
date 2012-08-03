@@ -24,9 +24,6 @@
 home = node['jenkins']['node']['home']
 url  = node['jenkins']['server']['url']
 
-jenkins_exe = "#{home}\\jenkins-slave.exe"
-service_name = "jenkinsslave"
-
 directory home do
   action :create
 end
@@ -41,25 +38,44 @@ env "JENKINS_URL" do
   value url
 end
 
-template "#{home}/jenkins-slave.xml" do
-  source "jenkins-slave.xml"
-  variables(:jenkins_home => home,
-            :jnlp_url => "#{url}/computer/#{node['jenkins']['node']['name']}/slave-agent.jnlp")
+execute "Disable Firewall" do
+  command "netsh advfirewall set allprofiles state off"
 end
 
-#XXX how-to get this directly from the jenkins server?
-remote_file jenkins_exe do
-  source "http://maven.dyndns.org/2/com/sun/winsw/winsw/1.8/winsw-1.8-bin.exe"
-  not_if { File.exists?(jenkins_exe) }
+service "RemoteRegistry" do
+  action :start
 end
 
-execute "#{jenkins_exe} install" do
-  cwd home
-  only_if { WMI::Win32_Service.find(:first, :conditions => {:name => service_name}).nil? }
-end
-
-service service_name do
-  action :nothing
+powershell "wbem-permissions" do
+    code <<-EOH
+        $definition = @"
+        using System;
+        using System.Runtime.InteropServices;
+        namespace Win32Api
+        {
+        public class NtDll
+        {
+            [DllImport("ntdll.dll", EntryPoint="RtlAdjustPrivilege")]
+            public static extern int RtlAdjustPrivilege(ulong Privilege, bool Enable, bool CurrentThread, ref bool Enabled);
+        }
+        }
+"@
+        Add-Type -TypeDefinition $definition -PassThru
+        $bEnabled = $false
+        # Enable SeTakeOwnershipPrivilege
+        $res = [Win32Api.NtDll]::RtlAdjustPrivilege(9, $true, $false, [ref]$bEnabled)
+        $key = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("CLSID\\{76A64158-CB41-11D1-8B02-00600806D9B6}", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,[System.Security.AccessControl.RegistryRights]::takeownership)
+        $acl = $key.GetAccessControl()
+        $acl.SetOwner([System.Security.Principal.NTAccount]"Administrators")
+        $key.SetAccessControl($acl)
+            
+        $key2 = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("CLSID\\{76A64158-CB41-11D1-8B02-00600806D9B6}",[Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,[System.Security.AccessControl.RegistryRights]::ChangePermissions)
+    
+        $acl = $key2.GetAccessControl()
+        $rule = New-Object System.Security.AccessControl.RegistryAccessRule ("BUILTIN\\Administrators","FullControl","Allow")
+        $acl.SetAccessRule($rule)
+        $key2.SetAccessControl($acl)
+    EOH
 end
 
 jenkins_node node['jenkins']['node']['name'] do
@@ -68,16 +84,10 @@ jenkins_node node['jenkins']['node']['name'] do
   remote_fs    node['jenkins']['node']['home']
   labels       node['jenkins']['node']['labels']
   mode         node['jenkins']['node']['mode']
-  launcher     node['jenkins']['node']['launcher']
+  launcher     "service"
   mode         node['jenkins']['node']['mode']
   availability node['jenkins']['node']['availability']
-end
-
-remote_file "#{home}\\slave.jar" do
-  source "#{url}/jnlpJars/slave.jar"
-  notifies :restart, resources(:service => service_name), :immediately
-end
-
-service service_name do
-  action :start
+  username     node['jenkins']['node']['user']
+  password     node['jenkins']['node']['pass']
+  host         node['ipaddr']
 end
